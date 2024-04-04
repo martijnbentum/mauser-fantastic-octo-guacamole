@@ -4,6 +4,7 @@
 import json
 import glob
 import mauser
+from pathlib import Path
 
 directory = '../../LD/COMMON_VOICE_POLISH/'
 textgrid_directory = directory + 'textgrids/'
@@ -26,7 +27,7 @@ def make_transcription_files():
             f.write(text)
     
 def make_files(force_make = False):
-    if not force_make:
+    if not force_make and Path('polish_files.json').exists():
         with open('polish_files.json', 'r') as f:
             files = json.load(f)
         return files
