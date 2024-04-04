@@ -12,8 +12,9 @@ class Pipeline:
         output_format = 'TextGrid', pipe = 'G2P_MAUS_PHO2SYL', preseg = 'true'):
         
         self.files= files
+        self.output_directory = output_directory
         self.language = language
-        self.output_format = TextGrid
+        self.output_format = output_format
         self.pip = pipe
         self.preseg = preseg
         self.data = create_data_dict(language, output_format, pipe, preseg)
@@ -30,20 +31,19 @@ class Pipeline:
         return m
 
     def run(self):
-        for line in self.files:
+        for line in progressbar(self.files):
             if line['audio_filename'] in self.done: continue
             self.check_load()            
-            self._run_single(**files)
+            self._run_single(**line)
 
-    def _run_single(self, audio_filename, text_filename)
+    def _run_single(self, audio_filename, text_filename):
         output_filename = self._make_output_filename(audio_filename)
         if Path(output_filename).exists(): 
-            self.skipped(output_filename)
+            self.skipped.append(output_filename)
             if audio_filename not in self.done: self.done.append(audio_filename)
             return
         files = create_files_dict(audio_filename, text_filename)
         response = _run_pipeline(files, self.data)
-        response = Response(response)
         if response.success: 
             output = response.download()
             self.responses.append(response)
@@ -51,10 +51,19 @@ class Pipeline:
         else: self.error.append(response)
         
     def _make_output_filename(self, filename):
-        name = path(filename).stem
-        return self.output_directory + name + output_format
+        name = Path(filename).stem
+        return self.output_directory + name + self.output_format
+
+    def check_load(self):
+        self.load = get_load_indicator()
+        while self.load.load > 1:
+            time.sleep(1)
+            self.load = get_load_indicator()
 
 
+def save_output(output, filename):
+    with open(filename, 'w') as f:
+        f.write(output)
 
 
 class Response:
@@ -77,7 +86,7 @@ class Response:
 
     def _handle_load_indicator_response(self):
         self.type = 'load_indicator'
-        self.load = int(self.raw)
+        self.load = int(self.content)
 
     def _handle_pipeline_response(self):
         self.type = 'pipeline'
@@ -111,7 +120,7 @@ class Files():
 
     def _make_files(self):
         self.files= []
-        for af in progressbar(self.audio_filenames[:100]):
+        for af in progressbar(self.audio_filenames):
             for tf in self.text_filenames:
                 if af.stem== tf.stem:
                     d = {'audio_filename':str(af),
