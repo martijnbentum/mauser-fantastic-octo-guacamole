@@ -1,10 +1,11 @@
+import connector
 import json
 from lxml import etree
 from pathlib import Path
 from progressbar import progressbar
-import requests
+import subprocess
 import threading
-import url
+import time
 
 
 class Pipeline:
@@ -17,11 +18,14 @@ class Pipeline:
         self.output_format = output_format
         self.pip = pipe
         self.preseg = preseg
-        self.data = create_data_dict(language, output_format, pipe, preseg)
+        self.data = connector.create_data_dict(language, output_format, 
+            pipe, preseg)
         self.done = []
         self.responses = []
         self.skipped = []
         self.error = []
+        self.executers = []
+        self.wait_time = 1
 
     def __repr__(self):
         m = 'language: ' + self.data['LANGUAGE']
@@ -30,142 +34,103 @@ class Pipeline:
         m += ' | preseg: ' + self.data['PRESEG']
         return m
 
+    def remove_finished_executers(self):
+        temp = []
+        for executer in self.executers:
+            if executer.is_alive():
+                temp.append(executer)
+        self.executers = temp
+
+    def check_executers(self):
+        self.remove_finished_executers()
+        if len(self.executers) > 6:
+            print('\nwaiting for executers to finish\n')
+        while len(self.executers) > 6:
+            time.sleep(1)
+            self.remove_finished_executers()
+
     def run(self):
         for line in progressbar(self.files):
-            if line['audio_filename'] in self.done: continue
-            self.check_load()            
-            self._run_single(**line)
+            audio_filename = line['audio_filename']
+            output_filename = connector.make_output_filename(
+                self.output_directory,audio_filename, self.output_format)
+            if Path(output_filename).exists(): 
+                self.skipped.append(output_filename)
+                continue
+            self.check_executers()
+            d = {'line': line}
+            e = threading.Thread(target= self._run_single,kwargs=d)
+            e.start()
+            self.executers.append(e)
+            time.sleep(self.wait_time)
+                
+            #self._run_single(line)
 
-    def _run_single(self, audio_filename, text_filename):
-        output_filename = self._make_output_filename(audio_filename)
-        if Path(output_filename).exists(): 
-            self.skipped.append(output_filename)
-            if audio_filename not in self.done: self.done.append(audio_filename)
-            return
-        files = create_files_dict(audio_filename, text_filename)
-        response = _run_pipeline(files, self.data)
-        if response.success: 
-            output = response.download()
-            self.responses.append(response)
-            save_output(output, output_filename)
-        else: self.error.append(response)
+    def _run_single(self, line):
+        line.update(self.data)
+        line['output_directory'] = self.output_directory
+        result = run_command(line)
+        message = result.stdout.decode()
+        print(message, line['audio_filename'])
+        if 'output exists' in message:
+            self.skipped.append(line['audio_filename'], message)
+        elif 'error' in message:
+            self.error.append([line['audio_filename'], message])
+        if 'saved' in message:
+            self.done.append(line['audio_filename'])
+
+
+
         
     def _make_output_filename(self, filename):
         name = Path(filename).stem
-        return self.output_directory + name + self.output_format
+        return self.output_directory + name + '.' + self.output_format
 
     def check_load(self):
         self.load = get_load_indicator()
-        while self.load.load > 1:
-            time.sleep(1)
+        while self.load == None or self.load.load > 1:
+            time.sleep(5)
             self.load = get_load_indicator()
+        if self.load.load == 0: self.wait_time = 1
+        if self.load.load == 1: self.wait_time = 3
+
+    def check_executers(self):
+        self.remove_finished_executers()
+        if len(self.executers) > 6:
+            print('\nwaiting for executers to finish\n')
+        while len(self.executers) > 6:
+            time.sleep(1)
+            self.remove_finished_executers()
+
+    def remove_finished_executers(self):
+        temp = []
+        for executer in self.executers:
+            if executer.is_alive():
+                temp.append(executer)
+        self.executers = temp
 
 
-def save_output(output, filename):
-    with open(filename, 'w') as f:
-        f.write(output)
+def run_command(args):
+    cmd = 'python3 connector.py ' 
+    cmd += args['audio_filename'] 
+    cmd += ' ' + args['text_filename']
+    cmd += ' ' + args['output_directory']
+    cmd += ' ' + args['LANGUAGE'] 
+    cmd += ' --output_format ' + args['OUTFORMAT']
+    cmd += ' --pipe ' + args['PIPE'] 
+    cmd += ' --preseg ' + args['PRESEG']
+    print(cmd)
+    result = subprocess.run(cmd, shell=True,stdout=subprocess.PIPE, 
+        stderr=subprocess.PIPE)
+    return result
 
 
-class Response:
-    def __init__(self, response):
-        self.response = response
-        self.content = response.content.decode()
-        if self.content in ['0','1','2']:
-            self._handle_load_indicator_response()
-        if 'downloadLink' in self.content:
-            self._handle_pipeline_response()
-
-    def __repr__(self):
-        m = self.type 
-        if self.type == 'load_indicator':
-            m += ' | load: ' + str(self.load)
-        if self.type == 'pipeline':
-            m += ' | success: ' + str(self.success)
-            m += ' | output_filename: ' + self.output_filename
-        return m
-
-    def _handle_load_indicator_response(self):
-        self.type = 'load_indicator'
-        self.load = int(self.content)
-
-    def _handle_pipeline_response(self):
-        self.type = 'pipeline'
-        self.xml = etree.fromstring(self.content)
-        self.success = True if self.xml.find('success').text == 'true' else False
-        self.download_link = self.xml.find('downloadLink').text
-        self.output_filename = self.download_link.split('/')[-1]
-        self.output = self.xml.find('output').text
-        self.warnings = self.xml.find('warnings').text
-            
-    def download(self):
-        if hasattr(self,'download_output'):
-            return self.download_output
-        self.download_output = None
-        if self.success and self.type == 'pipeline':
-            self.download_response = requests.get(self.download_link)
-            self.download_output = self.download_response.content.decode()
-        return self.download_output
-
-class Files():
-    def __init__(self, audio_filenames, text_filenames, filename = ''):
-        self.audio_filenames = [Path(f) for f in audio_filenames]
-        self.text_filenames = [Path(f) for f in text_filenames]
-        self._make_files()
-        if filename:
-            self._save(filename)
-        
-    def __repr__(self):
-        m = 'Data | ' + str(len(self.datas)) + ' files'
-        return m
-
-    def _make_files(self):
-        self.files= []
-        for af in progressbar(self.audio_filenames):
-            for tf in self.text_filenames:
-                if af.stem== tf.stem:
-                    d = {'audio_filename':str(af),
-                        'text_filename':str(tf)}
-                    self.files.append(d)
-                    break
-
-    def _save(self, filename):
-        with open(filename, 'w') as f:
-            json.dump(self.files, f)
 
 
         
     
             
-def run_g2p_maus_phon2syl(audio_filename, text_filename, language, 
-    output_format = 'TextGrid', preseg = 'true'):
-    return run_pipeline(audio_filename, text_filename, language, output_format,
-        'G2P_MAUS_PHO2SYL', preseg)
 
-def run_pipeline(audio_filename, text_filename, language, 
-    output_format = 'TextGrid', pipe = 'G2P_MAUS_PHO2SYL', preseg = 'true'):
-    files = create_files_dict(audio_filename, text_filename)
-    data = create_data_dict(language, output_format, pipe, preseg)
-    return _run_pipeline(files, data)
 
-def _run_pipeline(files, data):
-    pipeline = url.pipeline
-    response = requests.post(pipeline, files=files, data=data)
-    return Response(response)
 
-def create_files_dict(audio_filename, text_filename):
-    return {'SIGNAL': open(audio_filename, 'rb'), 
-        'TEXT': open(text_filename, 'rb')}
-
-def create_data_dict(language, output_format = 'TextGrid', 
-    pipe = 'G2P_MAUS_PHO2SYL',preseg = True):
-    return {'LANGUAGE': language,
-            'OUTFORMAT': output_format,
-            'PRESEG': preseg,
-            'PIPE': pipe,
-            }
-
-def get_load_indicator():
-    load_indicator = url.load_indicator
-    response = requests.get(load_indicator)
-    return Response(response)
 
