@@ -33,7 +33,8 @@ def make_files(force_make = False):
         return files
     audio_filenames = glob.glob(audio_directory + '*.mp3')
     text_filenames = glob.glob(transcription_directory + '*.txt')
-    files = mauser.Files(audio_filenames, text_filenames, 'polish_files.json')
+    files = file_matcher.Files(audio_filenames, text_filenames, 
+        'polish_files.json')
     return files.files
 
 def make_force_align_pipeline():
