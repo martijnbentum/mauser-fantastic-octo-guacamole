@@ -45,9 +45,20 @@ class Pipeline:
         self.remove_finished_executers()
         if len(self.executers) > 6:
             print('\nwaiting for executers to finish\n')
+        self.start = time.time()
+        self.do_restart = False
         while len(self.executers) > 6:
             time.sleep(1)
             self.remove_finished_executers()
+            if self.start + 1200 < time.time():
+                self.do_restart = True
+                print('timeout, waiting to long for executers to finish')
+                raise KeyboardInterrupt
+                break
+        if self.do_restart:
+            print('restarting')
+            self.run()
+
 
     def run(self):
         for line in progressbar(self.files):
