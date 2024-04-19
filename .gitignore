@@ -1,3 +1,2 @@
 __pycache__/
-polish_files.json
-dutch_files.json
+*.json
