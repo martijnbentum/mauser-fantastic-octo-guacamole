@@ -6,6 +6,7 @@ from progressbar import progressbar
 import subprocess
 import threading
 import time
+import datetime
 
 
 class Pipeline:
@@ -44,7 +45,7 @@ class Pipeline:
     def check_executers(self):
         self.remove_finished_executers()
         if len(self.executers) > 6:
-            print('\nwaiting for executers to finish\n')
+            print('\nwaiting for executers to finish\n',datetime.datetime.now())
         self.start = time.time()
         self.do_restart = False
         while len(self.executers) > 6:
@@ -108,7 +109,7 @@ class Pipeline:
     def check_executers(self):
         self.remove_finished_executers()
         if len(self.executers) > 6:
-            print('\nwaiting for executers to finish\n')
+            print('\nwaiting for executers to finish\n',datetime.datetime.now())
         while len(self.executers) > 6:
             time.sleep(1)
             self.remove_finished_executers()
