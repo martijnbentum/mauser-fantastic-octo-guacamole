@@ -11,7 +11,8 @@ import datetime
 
 class Pipeline:
     def __init__(self, files, output_directory, language = 'pol-PL', 
-        output_format = 'TextGrid', pipe = 'G2P_MAUS_PHO2SYL', preseg = 'true'):
+        output_format = 'TextGrid', pipe = 'G2P_MAUS_PHO2SYL', preseg = 'true',
+        language_dict = None):
         
         self.files= files
         self.output_directory = output_directory
@@ -19,6 +20,7 @@ class Pipeline:
         self.output_format = output_format
         self.pip = pipe
         self.preseg = preseg
+        self.language_dict = language_dict
         self.data = connector.create_data_dict(language, output_format, 
             pipe, preseg)
         self.done = []
@@ -80,6 +82,10 @@ class Pipeline:
 
     def _run_single(self, line):
         line.update(self.data)
+        if self.language_dict:
+            sentence_id =  Path(line['audio_filename']).stem
+            accent = self.language_dict[sentence_id]
+            line['LANGUAGE'] = accent
         line['output_directory'] = self.output_directory
         result = run_command(line)
         message = result.stdout.decode()
