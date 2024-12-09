@@ -71,7 +71,9 @@ class Response:
         self.xml = etree.fromstring(self.content)
         self.success = True if self.xml.find('success').text == 'true' else False
         self.download_link = self.xml.find('downloadLink').text
-        self.output_filename = self.download_link.split('/')[-1]
+        if self.download_link:
+            self.output_filename = self.download_link.split('/')[-1]
+        else: self.output_filename = ''
         self.output = self.xml.find('output').text
         self.warnings = self.xml.find('warnings').text
             
