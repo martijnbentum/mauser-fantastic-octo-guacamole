@@ -1,10 +1,12 @@
 # process MLS data
 from datasets import load_dataset
 import json
+import mauser
 from pathlib import Path
 
 txt_dir = '/Users/martijn.bentum/Documents/dev_mls/txt/'
 wav_dir = '/Users/martijn.bentum/Documents/dev_mls/audio/'
+textgrid_dir = '/Users/martijn.bentum/Documents/dev_mls/textgrid/'
 
 def load_dutch():
     dataset = load_dataset("facebook/multilingual_librispeech", "dutch")
@@ -49,25 +51,15 @@ def handle_items_dutch_dev(dutch_dev = None,output_file = '../dutch_dev.json'):
         json.dump(output, f)
     return output
 
-    
 
-directory = '../cgn/comp-k/'
-textgrid_directory = directory + 'textgrids/'
-transcription_directory = directory + 'transcriptions/'
-
-def make_files():
-    with open('../cgn/file_map_k.json') as f:
-        file_map= json.load(f)
-    files = []
-    for cgn_id, audio_filename in file_map.items():
-        f = transcription_directory + cgn_id + '.txt'
-        d = {'audio_filename': audio_filename, 'text_filename': f}
-        files.append(d)
+def load_files():
+    with open('/Users/martijn.bentum/Documents/dev_mls/dutch_dev.json') as f:
+        files= json.load(f)
     return files
 
 def make_force_align_pipeline(files = None):
-    if not files: files = make_files()
-    p = mauser.Pipeline(files, textgrid_directory, language = 'nld-NL')
+    if not files: files = load_files()
+    p = mauser.Pipeline(files, textgrid_dir, language = 'nld-NL')
     return p
     
 
