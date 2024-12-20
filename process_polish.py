@@ -39,6 +39,6 @@ def make_files(force_make = False):
 
 def make_force_align_pipeline():
     files = make_files()
-    p = mauser.Pipeline(files, textgrid_directory)
+    p = mauser.Pipeline(files, textgrid_directory, language = 'pol-PL')
     return p
     
