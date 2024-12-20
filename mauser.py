@@ -10,7 +10,7 @@ import datetime
 
 
 class Pipeline:
-    def __init__(self, files, output_directory, language = 'pol-PL', 
+    def __init__(self, files, output_directory, language,  
         output_format = 'TextGrid', pipe = 'G2P_MAUS_PHO2SYL', preseg = 'true',
         language_dict = None):
         
