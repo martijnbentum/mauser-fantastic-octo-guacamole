@@ -9,7 +9,10 @@ from scipy.io.wavfile import write
 mls_dir = '/vol/mlusers/mbentum/mls/'
 
 def load_mls(language):
-    dataset = load_dataset("facebook/multilingual_librispeech", language)
+    if language == 'english':
+        dataset = load_dataset("parler-tts/mls_eng")
+    else:
+        dataset = load_dataset("facebook/multilingual_librispeech", language)
     return dataset
 
 
