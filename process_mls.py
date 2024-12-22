@@ -22,7 +22,10 @@ def make_txt_file(item, split, language):
     directory = f'{txt_dir}{split}/'
     Path(directory).mkdir(parents=True, exist_ok=True)
     text = item['transcript']
-    file_id = item['id']
+    if language == 'english':
+        file_id = item['audio']['path'].split('.')[0]
+    else:
+        file_id = item['id']
     filename = f'{file_id}.txt'
     filename = directory + filename
     with open(filename, 'w') as f:
@@ -31,8 +34,12 @@ def make_txt_file(item, split, language):
 
 def make_audio_filename(item, split, language):
     speaker = item['speaker_id']
-    chapter = item['chapter_id']
-    file_id = item['id']
+    if language == 'english':
+        file_id = item['audio']['path'].split('.')[0]
+        chapter = item['book_id']
+    else:
+        file_id = item['id']
+        chapter = item['chapter_id']
     wav_dir = f'{mls_dir}{language}/audio/'
     directory = f'{wav_dir}{split}/'
     Path(directory).mkdir(parents=True, exist_ok=True)
