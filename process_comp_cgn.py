@@ -1,4 +1,4 @@
-# Description: This script processes the common voice Polish dataset.
+# Description: This script processes the spoken dutch corpus dataset.
 # creates forced alignments   
 
 import glob
