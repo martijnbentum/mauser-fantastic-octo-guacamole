@@ -67,13 +67,13 @@ def file_id_to_wav_filename(file_id, partition = 'dev-clean'):
         raise ValueError('File does not exist: ' + str(filename), file_id)
     return filename
 
-def file_id_to_text_filename(file_id, partition = 'dev-clean', data = None):
+def file_id_to_text_filename(file_id, partition = 'dev-clean', data = None, overwrite = False):
     filename = transcription_root / (file_id + '.txt')
-    if not filename.exists():
+    if not filename.exists() or overwrite:
         tokens = file_id_to_tokens(file_id, partition, data)
         text = ' '.join(tokens)
         with open(filename, 'w') as f:
-            f.write(text)
+            f.write(text.lower())
     if not filename.exists():
         raise ValueError('Text file does not exist: ' + str(filename), file_id)
     return filename
@@ -85,12 +85,12 @@ def file_id_to_tokens(file_id, partition = 'dev-clean', data = None):
         raise ValueError('File ID not found in token file: ' + file_id)
     return data[file_id]
 
-def make_all_text_files():
+def make_all_text_files(overwrite = False):
     for partition in ['dev-clean', 'train-clean']:
-        print('processing partition', partition)
+        print('processing partition', partition, 'overwrite =', overwrite)
         data = load_token_file(partition)
         for file_id in progressbar(data):
-            _ = file_id_to_text_filename(file_id, partition, data)
+            _ = file_id_to_text_filename(file_id, partition, data, overwrite=overwrite)
     
 
 
